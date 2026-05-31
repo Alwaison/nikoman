@@ -1,0 +1,860 @@
+openapi: 3.1.0
+
+info:
+  title: Nikoman API
+  description: |-
+    REST API for managing Niko-Niko mood calendars for teams (Management 3.0).
+
+    A Niko-Niko calendar tracks each team member's daily mood (happy / neutral / sad)
+    to surface morale trends over time.
+
+    ## Response format
+    - **Single resource** – the resource object directly, no wrapper.
+    - **Collection** – `{ "data": [...], "meta": { pagination } }`.
+    - **Deleted** – HTTP 204, empty body.
+    - **Validation error** – HTTP 422, `{ "message": "...", "errors": { field: [msg] } }`.
+    - **Not found** – HTTP 404, `{ "message": "..." }`.
+  version: 1.0.0
+  license:
+    name: MIT
+    identifier: MIT
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Health
+    description: Application liveness
+  - name: Teams
+    description: Team management and membership
+  - name: Members
+    description: Member management
+  - name: Mood Entries
+    description: Daily mood logging
+  - name: Calendar
+    description: Niko-Niko calendar read projection
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Paths
+# ──────────────────────────────────────────────────────────────────────────────
+
+paths:
+
+  # ── Health ──────────────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      tags: [Health]
+      operationId: health.check
+      summary: Liveness check
+      security: []
+      responses:
+        '200':
+          description: Application is running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                status: ok
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── Teams ────────────────────────────────────────────────────────────────────
+
+  /teams:
+    get:
+      tags: [Teams]
+      operationId: teams.index
+      summary: List teams
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated list of teams
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamCollection'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Teams]
+      operationId: teams.store
+      summary: Create a team
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamRequest'
+      responses:
+        '201':
+          description: Team created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /teams/{teamId}:
+    parameters:
+      - $ref: '#/components/parameters/TeamId'
+
+    get:
+      tags: [Teams]
+      operationId: teams.show
+      summary: Get a team
+      responses:
+        '200':
+          description: Team found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Teams]
+      operationId: teams.update
+      summary: Update a team
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamRequest'
+      responses:
+        '200':
+          description: Team updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    delete:
+      tags: [Teams]
+      operationId: teams.destroy
+      summary: Delete a team
+      responses:
+        '204':
+          description: Team deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /teams/{teamId}/members:
+    parameters:
+      - $ref: '#/components/parameters/TeamId'
+
+    get:
+      tags: [Teams]
+      operationId: teams.members.index
+      summary: List members of a team
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated list of team members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberCollection'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Teams]
+      operationId: teams.members.store
+      summary: Add an existing member to a team
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddMemberToTeamRequest'
+      responses:
+        '201':
+          description: Member added to the team
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /teams/{teamId}/members/{memberId}:
+    parameters:
+      - $ref: '#/components/parameters/TeamId'
+      - $ref: '#/components/parameters/MemberId'
+
+    delete:
+      tags: [Teams]
+      operationId: teams.members.destroy
+      summary: Remove a member from a team
+      responses:
+        '204':
+          description: Member removed from team
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /teams/{teamId}/calendar:
+    parameters:
+      - $ref: '#/components/parameters/TeamId'
+
+    get:
+      tags: [Calendar]
+      operationId: teams.calendar.show
+      summary: Get the Niko-Niko calendar for a team
+      description: |-
+        Returns a read projection of all mood entries for the team within the given date range,
+        grouped by day. Days with no entries are omitted.
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: Start date of the period (inclusive)
+          schema:
+            type: string
+            format: date
+          example: '2024-01-01'
+        - name: to
+          in: query
+          required: true
+          description: End date of the period (inclusive)
+          schema:
+            type: string
+            format: date
+          example: '2024-01-31'
+      responses:
+        '200':
+          description: Calendar for the requested period
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Calendar'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ── Members ──────────────────────────────────────────────────────────────────
+
+  /members:
+    get:
+      tags: [Members]
+      operationId: members.index
+      summary: List members
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated list of members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberCollection'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Members]
+      operationId: members.store
+      summary: Create a member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemberRequest'
+      responses:
+        '201':
+          description: Member created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /members/{memberId}:
+    parameters:
+      - $ref: '#/components/parameters/MemberId'
+
+    get:
+      tags: [Members]
+      operationId: members.show
+      summary: Get a member
+      responses:
+        '200':
+          description: Member found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Members]
+      operationId: members.update
+      summary: Update a member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemberRequest'
+      responses:
+        '200':
+          description: Member updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    delete:
+      tags: [Members]
+      operationId: members.destroy
+      summary: Delete a member
+      responses:
+        '204':
+          description: Member deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Mood Entries ─────────────────────────────────────────────────────────────
+
+  /mood-entries:
+    get:
+      tags: [Mood Entries]
+      operationId: moodEntries.index
+      summary: List mood entries
+      parameters:
+        - name: team_id
+          in: query
+          description: Filter by team UUID
+          schema:
+            type: string
+            format: uuid
+        - name: member_id
+          in: query
+          description: Filter by member UUID
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          description: Filter entries from this date (inclusive)
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          description: Filter entries up to this date (inclusive)
+          schema:
+            type: string
+            format: date
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PerPage'
+      responses:
+        '200':
+          description: Paginated list of mood entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoodEntryCollection'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Mood Entries]
+      operationId: moodEntries.store
+      summary: Log a mood entry
+      description: |-
+        A member can only have one mood entry per team per day.
+        Attempting to log a second entry for the same member/team/date returns 422.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoodEntryCreateRequest'
+      responses:
+        '201':
+          description: Mood entry logged
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoodEntry'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /mood-entries/{entryId}:
+    parameters:
+      - $ref: '#/components/parameters/EntryId'
+
+    get:
+      tags: [Mood Entries]
+      operationId: moodEntries.show
+      summary: Get a mood entry
+      responses:
+        '200':
+          description: Mood entry found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoodEntry'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Mood Entries]
+      operationId: moodEntries.update
+      summary: Update a mood entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoodEntryUpdateRequest'
+      responses:
+        '200':
+          description: Mood entry updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoodEntry'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    delete:
+      tags: [Mood Entries]
+      operationId: moodEntries.destroy
+      summary: Delete a mood entry
+      responses:
+        '204':
+          description: Mood entry deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Components
+# ──────────────────────────────────────────────────────────────────────────────
+
+components:
+
+  # ── Security ─────────────────────────────────────────────────────────────────
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Token
+      description: Laravel Sanctum API token
+
+  # ── Reusable parameters ───────────────────────────────────────────────────────
+
+  parameters:
+    TeamId:
+      name: teamId
+      in: path
+      required: true
+      description: Team UUID
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
+
+    MemberId:
+      name: memberId
+      in: path
+      required: true
+      description: Member UUID
+      schema:
+        type: string
+        format: uuid
+
+    EntryId:
+      name: entryId
+      in: path
+      required: true
+      description: Mood entry UUID
+      schema:
+        type: string
+        format: uuid
+
+    Page:
+      name: page
+      in: query
+      description: Page number
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    PerPage:
+      name: per_page
+      in: query
+      description: Items per page
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 15
+
+  # ── Reusable responses ────────────────────────────────────────────────────────
+
+  responses:
+    Unauthorized:
+      description: Unauthenticated — missing or invalid Bearer token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UnauthenticatedError'
+          example:
+            message: Unauthenticated.
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/NotFoundError'
+          example:
+            message: No query results for model.
+
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+          example:
+            message: The name field is required.
+            errors:
+              name:
+                - The name field is required.
+
+  # ── Schemas ───────────────────────────────────────────────────────────────────
+
+  schemas:
+
+    # ── Shared / primitives ───────────────────────────────────────────────────
+
+    Mood:
+      type: string
+      enum:
+        - happy
+        - neutral
+        - sad
+      description: Team member's mood for the day
+
+    Pagination:
+      type: object
+      required: [total, per_page, current_page, last_page]
+      properties:
+        total:
+          type: integer
+          example: 42
+        per_page:
+          type: integer
+          example: 15
+        current_page:
+          type: integer
+          example: 1
+        last_page:
+          type: integer
+          example: 3
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+
+    UnauthenticatedError:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: Unauthenticated.
+
+    NotFoundError:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    ValidationError:
+      type: object
+      required: [message, errors]
+      properties:
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    # ── Team ─────────────────────────────────────────────────────────────────
+
+    Team:
+      type: object
+      required: [id, name, description, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: Engineering
+        description:
+          type: ['string', 'null']
+          maxLength: 1000
+          example: The core engineering team
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+    TeamCollection:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Team'
+        meta:
+          $ref: '#/components/schemas/Pagination'
+
+    TeamRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: ['string', 'null']
+          maxLength: 1000
+
+    # ── Member ────────────────────────────────────────────────────────────────
+
+    Member:
+      type: object
+      required: [id, name, email, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          example: Jane Doe
+        email:
+          type: string
+          format: email
+          example: jane@example.com
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+    MemberCollection:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Member'
+        meta:
+          $ref: '#/components/schemas/Pagination'
+
+    MemberRequest:
+      type: object
+      required: [name, email]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        email:
+          type: string
+          format: email
+
+    AddMemberToTeamRequest:
+      type: object
+      required: [member_id]
+      properties:
+        member_id:
+          type: string
+          format: uuid
+          description: UUID of an existing member to add to the team
+
+    # ── Mood Entry ────────────────────────────────────────────────────────────
+
+    MoodEntry:
+      type: object
+      required: [id, team_id, member_id, mood, date, note, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        team_id:
+          type: string
+          format: uuid
+        member_id:
+          type: string
+          format: uuid
+        mood:
+          $ref: '#/components/schemas/Mood'
+        date:
+          type: string
+          format: date
+          example: '2024-01-15'
+        note:
+          type: ['string', 'null']
+          maxLength: 500
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+
+    MoodEntryCollection:
+      type: object
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/MoodEntry'
+        meta:
+          $ref: '#/components/schemas/Pagination'
+
+    MoodEntryCreateRequest:
+      type: object
+      required: [team_id, member_id, mood, date]
+      properties:
+        team_id:
+          type: string
+          format: uuid
+        member_id:
+          type: string
+          format: uuid
+        mood:
+          $ref: '#/components/schemas/Mood'
+        date:
+          type: string
+          format: date
+          example: '2024-01-15'
+        note:
+          type: ['string', 'null']
+          maxLength: 500
+
+    MoodEntryUpdateRequest:
+      type: object
+      required: [mood]
+      properties:
+        mood:
+          $ref: '#/components/schemas/Mood'
+        note:
+          type: ['string', 'null']
+          maxLength: 500
+
+    # ── Calendar ──────────────────────────────────────────────────────────────
+
+    CalendarEntry:
+      type: object
+      required: [member, mood]
+      properties:
+        member:
+          $ref: '#/components/schemas/Member'
+        mood:
+          $ref: '#/components/schemas/Mood'
+        note:
+          type: ['string', 'null']
+
+    CalendarDay:
+      type: object
+      required: [date, entries]
+      properties:
+        date:
+          type: string
+          format: date
+          example: '2024-01-15'
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarEntry'
+
+    Calendar:
+      type: object
+      required: [team, period, days]
+      properties:
+        team:
+          $ref: '#/components/schemas/Team'
+        period:
+          type: object
+          required: [from, to]
+          properties:
+            from:
+              type: string
+              format: date
+              example: '2024-01-01'
+            to:
+              type: string
+              format: date
+              example: '2024-01-31'
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarDay'
