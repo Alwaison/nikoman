@@ -13,9 +13,9 @@ enum Mood: string
     public function label(): string
     {
         return match ($this) {
-            Mood::Happy   => 'Happy',
+            Mood::Happy => 'Happy',
             Mood::Neutral => 'Neutral',
-            Mood::Sad     => 'Sad',
+            Mood::Sad => 'Sad',
         };
     }
 

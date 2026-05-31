@@ -7,9 +7,6 @@ parameters:
 
     level: 8
 
-    checkMissingIterableValueType: true
-    checkGenericClassInNonGenericObjectType: true
-
     excludePaths: []
 
     ignoreErrors: []
