@@ -12,7 +12,7 @@ API-First: no frontend, no Blade views, all responses are JSON.
 
 | Layer        | Technology          |
 |--------------|---------------------|
-| Language     | PHP 8.3             |
+| Language     | PHP 8.4             |
 | Framework    | Laravel 12          |
 | Web server   | nginx 1.26          |
 | Database     | PostgreSQL 17       |
