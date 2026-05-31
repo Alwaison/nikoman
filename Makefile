@@ -1,5 +1,8 @@
 .DEFAULT_GOAL := help
-.PHONY: help install up down restart bash artisan composer test migrate fresh logs ps
+.PHONY: help install up down restart bash artisan composer \
+        test test-unit test-feature test-filter \
+        lint lint-fix analyse quality \
+        migrate fresh logs ps spec-lint
 
 help: ## Show available commands
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -59,5 +62,29 @@ fresh: ## Drop all tables, re-run migrations and seeders
 test: ## Run the full test suite
 	docker compose exec app php artisan test
 
+test-unit: ## Run Unit tests only (no DB required)
+	docker compose exec app php artisan test --testsuite=Unit
+
+test-feature: ## Run Feature tests only
+	docker compose exec app php artisan test --testsuite=Feature
+
 test-filter: ## Run tests matching a filter: make test-filter f=TeamTest
 	docker compose exec app php artisan test --filter=$(f)
+
+# ─── Code quality ─────────────────────────────────────────────────────────────
+
+lint: ## Check code style without making changes
+	docker compose exec app ./vendor/bin/pint --test
+
+lint-fix: ## Fix code style issues
+	docker compose exec app ./vendor/bin/pint
+
+analyse: ## Static analysis (Larastan level 8)
+	docker compose exec app ./vendor/bin/phpstan analyse --memory-limit=512M
+
+quality: lint analyse ## Run all quality checks (lint + static analysis)
+
+# ─── Specification ────────────────────────────────────────────────────────────
+
+spec-lint: ## Validate the OpenAPI specification
+	docker run --rm -v $(PWD)/specification:/spec -w /spec redocly/cli lint --config .redocly.yaml nikoman.yaml
