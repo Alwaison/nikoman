@@ -88,7 +88,25 @@ src/app/
     └── Resources/Api/V1/    # API Resource response shaping
 ```
 
-### Layer rules
+## OpenAPI specification
+
+The contract lives in `specification/nikoman.yaml` (OpenAPI 3.1). It is the source of truth for every endpoint, schema, and response code.
+
+**After every change to `specification/nikoman.yaml`:**
+
+```bash
+make spec-lint
+```
+
+The spec must pass with **0 errors and 0 warnings** before the change is committed. Fix every issue the linter reports — do not suppress warnings in `.redocly.yaml` unless the rule is globally inapplicable to the project (e.g. `no-server-example.com` for the intentional localhost dev server).
+
+Lint rules that apply:
+- Every operation that returns a single entity must include a `404` response.
+- Every authenticated operation must include a `401` response.
+- License must carry an SPDX `identifier`.
+- All `$ref` targets must resolve.
+
+## Architecture conventions
 
 - **Domain** classes must not import anything from `Illuminate\` or `App\Infrastructure\`.
 - **Application** services receive domain objects via constructor injection; never touch Eloquent directly.

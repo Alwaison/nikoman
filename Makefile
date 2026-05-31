@@ -1,10 +1,8 @@
 .DEFAULT_GOAL := help
 .PHONY: help install up down restart bash artisan composer \
-        test test-unit test-feature test-integration test-filter \
+        test test-unit test-feature test-filter \
         lint lint-fix analyse quality \
-        migrate fresh logs ps
-
-# ─── Help ─────────────────────────────────────────────────────────────────────
+        migrate fresh logs ps spec-lint
 
 help: ## Show available commands
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -113,7 +111,12 @@ lint: ## Check code style without making changes
 lint-fix: ## Fix code style issues
 	docker compose exec app ./vendor/bin/pint
 
-analyse: ## Run static analysis (Larastan level 8)
+analyse: ## Static analysis (Larastan level 8)
 	docker compose exec app ./vendor/bin/phpstan analyse --memory-limit=512M
 
 quality: lint analyse ## Run all quality checks (lint + static analysis)
+
+# ─── Specification ────────────────────────────────────────────────────────────
+
+spec-lint: ## Validate the OpenAPI specification
+	docker run --rm -v $(PWD)/specification:/spec -w /spec redocly/cli lint --config .redocly.yaml nikoman.yaml
