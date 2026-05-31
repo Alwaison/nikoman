@@ -6,76 +6,131 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **nikoman** is a REST API for managing Niko-Niko calendars for teams (Management 3.0). A Niko-Niko calendar tracks each team member's daily mood (happy / neutral / sad) to surface morale trends over time.
 
-The approach is **API-First**: no web frontend, no Blade views, pure JSON responses.
+API-First: no frontend, no Blade views, all responses are JSON.
 
 ## Stack
 
-| Layer      | Technology            |
-|------------|-----------------------|
-| Language   | PHP 8.3               |
-| Framework  | Laravel 12            |
-| Web server | nginx 1.26            |
-| Database   | PostgreSQL 17         |
-| Runtime    | Docker (all services) |
+| Layer        | Technology          |
+|--------------|---------------------|
+| Language     | PHP 8.3             |
+| Framework    | Laravel 12          |
+| Web server   | nginx 1.26          |
+| Database     | PostgreSQL 17       |
+| Runtime      | Docker (all services)|
+| Tests        | PHPUnit 11          |
+| Style linter | Laravel Pint        |
+| Static analysis | Larastan (PHPStan level 8) |
 
 ## First-time setup
 
 ```bash
-cp .env.example .env      # adjust ports/credentials if needed
-make install              # creates Laravel project in src/, runs migrations
+cp .env.example .env      # adjust ports/passwords if needed
+make install              # installs Laravel, quality tools, scaffolds architecture, migrates
 ```
 
-After that, `make up` / `make down` manages the environment.
+After that, `make up` / `make down` is all that's needed.
 
-## Common commands
+## Development commands
 
 ```bash
+# Environment
 make up                           # start containers
 make down                         # stop containers
 make bash                         # shell into PHP-FPM container
-make artisan cmd="route:list"     # run any artisan command
-make composer cmd="require pkg"   # run any composer command
+make logs s=app                   # tail a specific service log
+
+# Laravel
+make artisan cmd="route:list"     # any artisan command
+make composer cmd="require pkg"   # any composer command
 make migrate                      # run pending migrations
 make fresh                        # drop + re-migrate + seed
-make test                         # full test suite
-make test-filter f=TeamTest       # run tests matching a name
-make logs s=app                   # tail a specific service log
+
+# Testing (TDD workflow)
+make test                         # full suite
+make test-unit                    # Unit only (no DB, fastest)
+make test-feature                 # Feature only
+make test-integration             # Integration only
+make test-filter f=MoodTest       # run tests matching a name
+
+# Quality (run before every commit)
+make quality                      # lint + static analysis
+make lint                         # Pint check (dry run)
+make lint-fix                     # Pint auto-fix
+make analyse                      # Larastan PHPStan level 8
 ```
 
-## Project structure
+## Architecture
+
+The project follows clean architecture with strict layer separation:
 
 ```
-docker/
-  nginx/default.conf      nginx virtualhost (serves src/public)
-  php/Dockerfile          PHP-FPM 8.3-alpine with pdo_pgsql, pcntl, opcache
-  php/php.ini             PHP runtime overrides
-  laravel.env.example     Template for src/.env (Docker-aware DB host, etc.)
-src/                      Laravel 12 application (populated by make install)
-docker-compose.yml        Defines app, nginx, db services
-Makefile                  Dev workflow shortcuts
-.env.example              Docker-level env vars (ports, DB credentials)
+src/app/
+├── Domain/              # Pure PHP — no framework dependencies
+│   ├── Calendar/
+│   │   ├── Entities/
+│   │   ├── Repositories/    # interfaces only
+│   │   └── ValueObjects/    # e.g. Mood enum
+│   ├── Team/
+│   └── Member/
+├── Application/         # Use cases — orchestrates domain objects
+│   ├── Calendar/
+│   │   ├── Commands/    # writes (CreateMoodEntry, etc.)
+│   │   └── Queries/     # reads (GetTeamCalendar, etc.)
+│   ├── Team/
+│   └── Member/
+├── Infrastructure/      # Framework-dependent adapters
+│   └── Persistence/
+│       ├── Models/          # Eloquent models (infra detail)
+│       └── Repositories/    # Eloquent implementations of domain interfaces
+└── Http/
+    ├── Controllers/Api/V1/  # thin: validate → service → resource
+    ├── Requests/Api/V1/     # Form Request validation
+    └── Resources/Api/V1/    # API Resource response shaping
 ```
 
-## Architecture conventions
+### Layer rules
 
-- All API routes live under `/api/v1/` — version prefix is mandatory from day one.
-- Use [API Resources](https://laravel.com/docs/12.x/eloquent-resources) (`app/Http/Resources/`) for all response shaping.
-- Request validation goes in [Form Requests](https://laravel.com/docs/12.x/validation#form-request-validation) (`app/Http/Requests/`).
-- Business logic belongs in service classes (`app/Services/`), not in controllers.
-- Controllers are thin: validate → delegate to service → return resource.
+- **Domain** classes must not import anything from `Illuminate\` or `App\Infrastructure\`.
+- **Application** services receive domain objects via constructor injection; never touch Eloquent directly.
+- **Controllers** are thin: parse request → call one Application service → return one Resource.
+- All new files must have `declare(strict_types=1)` (enforced by Pint).
 
-## Domain model (Niko-Niko)
+## TDD workflow
 
-Core entities the API will expose:
+Red → Green → Refactor:
 
-- **Team** — a group of people sharing a calendar.
-- **Member** — a user who belongs to one or more teams.
-- **MoodEntry** — a single daily mood record (happy / neutral / sad) tied to a member and a date.
-- **Calendar** — a read-projection that aggregates MoodEntry records for a team over a date range.
+1. Write a failing test in `tests/Unit/Domain/` or `tests/Feature/Api/V1/`.
+2. Run `make test-unit` (or `make test-filter f=YourTest`) — confirm red.
+3. Write the minimum code to pass.
+4. Run `make quality` to pass lint + static analysis.
+5. Refactor if needed, keeping tests green.
+
+**Unit tests** (`tests/Unit/`) extend `PHPUnit\Framework\TestCase` directly — no Laravel bootstrap, no DB.  
+**Feature tests** (`tests/Feature/`) extend `Tests\TestCase` and use `RefreshDatabase` — DB required.  
+**Integration tests** (`tests/Integration/`) test repository implementations against the real PostgreSQL DB.
+
+## Domain model
+
+| Entity       | Description                                              |
+|--------------|----------------------------------------------------------|
+| `Team`       | A group of people sharing a Niko-Niko calendar.          |
+| `Member`     | A user who belongs to one or more teams.                 |
+| `MoodEntry`  | One mood record per member per day (happy/neutral/sad).  |
+| `Mood`       | Value object / enum — the three possible mood values.    |
+
+## API conventions
+
+- All routes prefixed `/api/v1/`.
+- Responses follow JSON:API-inspired structure: `{ data, meta, errors }`.
+- HTTP status codes: 200 OK, 201 Created, 204 No Content, 422 Unprocessable Entity, 404 Not Found.
+- Validation errors return 422 with an `errors` key listing field-level messages.
 
 ## Docker networking
 
-The three services communicate on a private Docker network:
-- `app` (PHP-FPM on port 9000) — not exposed externally.
-- `nginx` (port 80 inside, `APP_PORT` outside) — only public entry point.
-- `db` (PostgreSQL on port 5432 inside, `DB_EXTERNAL_PORT` outside) — the app connects to host `db`.
+| Service | Internal address | External port |
+|---------|-----------------|---------------|
+| nginx   | port 80         | `APP_PORT` (default 8080) |
+| app     | app:9000        | not exposed   |
+| db      | db:5432         | `DB_EXTERNAL_PORT` (default 5432) |
+
+The test database `nikoman_test` is created automatically on first PostgreSQL startup via `docker/postgres/init-test-db.sh`.
