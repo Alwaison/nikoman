@@ -1,22 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Providers;
 
+use App\Domain\Member\Repositories\MemberRepositoryInterface;
+use App\Infrastructure\Persistence\Repositories\EloquentMemberRepository;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
-    /**
-     * Register any application services.
-     */
     public function register(): void
     {
-        //
+        $this->app->bind(MemberRepositoryInterface::class, EloquentMemberRepository::class);
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
         //
