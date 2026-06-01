@@ -14,7 +14,7 @@ final class EloquentMemberRepository implements MemberRepositoryInterface
 {
     public function save(Member $member): void
     {
-        MemberModel::updateOrCreate(
+        MemberModel::query()->updateOrCreate(
             ['id' => $member->id()],
             [
                 'name' => $member->name(),
@@ -27,7 +27,7 @@ final class EloquentMemberRepository implements MemberRepositoryInterface
 
     public function findById(string $id): ?Member
     {
-        $model = MemberModel::find($id);
+        $model = MemberModel::query()->find($id);
 
         if ($model === null) {
             return null;
@@ -44,7 +44,7 @@ final class EloquentMemberRepository implements MemberRepositoryInterface
 
     public function delete(string $id): void
     {
-        MemberModel::destroy($id);
+        MemberModel::query()->whereKey($id)->delete();
     }
 
     /** @return PaginatedResult<Member> */
