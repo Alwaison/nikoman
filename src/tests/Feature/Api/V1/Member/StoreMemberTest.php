@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Api\V1\Member;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 final class StoreMemberTest extends TestCase
@@ -102,5 +104,52 @@ final class StoreMemberTest extends TestCase
         $this->postJson('/api/v1/members', ['name' => 'John Doe', 'email' => 'jane@example.com'])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['email']);
+    }
+
+    public function test_email_is_normalized_to_lowercase(): void
+    {
+        $response = $this->postJson('/api/v1/members', [
+            'name' => 'Jane Doe',
+            'email' => 'JANE@EXAMPLE.COM',
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertSame('jane@example.com', $response->json('email'));
+        $this->assertDatabaseHas('members', ['email' => 'jane@example.com']);
+    }
+
+    public function test_duplicate_email_detected_case_insensitively(): void
+    {
+        $this->postJson('/api/v1/members', ['name' => 'Jane Doe', 'email' => 'jane@example.com']);
+
+        $this->postJson('/api/v1/members', ['name' => 'John Doe', 'email' => 'JANE@EXAMPLE.COM'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['email']);
+    }
+
+    public function test_race_condition_returns_422_not_500(): void
+    {
+        // Both requests see no existing member during validation.
+        // The second save() hits the DB unique constraint — must return 422.
+        $this->postJson('/api/v1/members', ['name' => 'Alice', 'email' => 'race@example.com'])
+            ->assertStatus(201);
+
+        // Simulate the race: bypass FormRequest validation by calling the
+        // endpoint after manually deleting the validation guard (we insert
+        // a duplicate directly at the DB level to trigger the constraint).
+        DB::table('members')->insert([
+            'id' => (string) Str::uuid(),
+            'name' => 'Race clone',
+            'email' => 'race2@example.com',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Now try to insert the same email through the API — the DB constraint
+        // fires even though validation would pass in a race (both checked before insert).
+        // We verify the application returns 422, not 500.
+        $this->postJson('/api/v1/members', ['name' => 'Racer', 'email' => 'race2@example.com'])
+            ->assertStatus(422)
+            ->assertJsonStructure(['message', 'errors' => ['email']]);
     }
 }

@@ -177,4 +177,36 @@ final class UpdateMemberTest extends TestCase
             'email' => 'ghost@example.com',
         ])->assertStatus(404);
     }
+
+    public function test_email_is_normalized_to_lowercase_on_update(): void
+    {
+        $id = $this->postJson('/api/v1/members', [
+            'name' => 'Jane Doe',
+            'email' => 'jane@example.com',
+        ])->json('id');
+
+        $response = $this->putJson("/api/v1/members/{$id}", [
+            'name' => 'Jane Doe',
+            'email' => 'JANE.NEW@EXAMPLE.COM',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertSame('jane.new@example.com', $response->json('email'));
+        $this->assertDatabaseHas('members', ['email' => 'jane.new@example.com']);
+    }
+
+    public function test_update_rejects_email_taken_by_another_member_regardless_of_case(): void
+    {
+        $this->postJson('/api/v1/members', ['name' => 'Alice', 'email' => 'alice@example.com']);
+
+        $id = $this->postJson('/api/v1/members', [
+            'name' => 'Jane Doe',
+            'email' => 'jane@example.com',
+        ])->json('id');
+
+        $this->putJson("/api/v1/members/{$id}", [
+            'name' => 'Jane Doe',
+            'email' => 'ALICE@EXAMPLE.COM',
+        ])->assertStatus(422)->assertJsonValidationErrors(['email']);
+    }
 }

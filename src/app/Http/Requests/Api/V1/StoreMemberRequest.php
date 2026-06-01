@@ -8,6 +8,13 @@ use Illuminate\Foundation\Http\FormRequest;
 
 final class StoreMemberRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('email')) {
+            $this->merge(['email' => strtolower((string) $this->input('email'))]);
+        }
+    }
+
     /**
      * @return array<string, array<string>>
      */
