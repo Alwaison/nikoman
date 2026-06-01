@@ -10,4 +10,5 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/health', fn (): JsonResponse => response()->json(['status' => 'ok']))->name('health');
 
     Route::post('/members', [MemberController::class, 'store'])->name('members.store');
+    Route::get('/members/{memberId}', [MemberController::class, 'show'])->name('members.show');
 });
