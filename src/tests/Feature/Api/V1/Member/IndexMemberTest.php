@@ -149,4 +149,29 @@ final class IndexMemberTest extends TestCase
         $this->assertSame($first, $data[0]['id']);
         $this->assertSame($second, $data[1]['id']);
     }
+
+    public function test_pagination_is_stable_when_members_share_the_same_timestamp(): void
+    {
+        // All members inserted within the same second → created_at ties.
+        // Without a deterministic tiebreaker (id) the DB can return rows in
+        // any order, causing page boundaries to shift between requests and
+        // producing skipped or duplicated rows.
+        $ids = [];
+        for ($i = 1; $i <= 4; $i++) {
+            $ids[] = $this->postJson('/api/v1/members', [
+                'name' => "Member {$i}",
+                'email' => "member{$i}@example.com",
+            ])->json('id');
+        }
+
+        $page1 = $this->getJson('/api/v1/members?per_page=2&page=1')->json('data');
+        $page2 = $this->getJson('/api/v1/members?per_page=2&page=2')->json('data');
+
+        $allIds = array_merge(
+            array_column($page1, 'id'),
+            array_column($page2, 'id'),
+        );
+
+        $this->assertCount(4, array_unique($allIds), 'No rows should be skipped or duplicated across pages.');
+    }
 }

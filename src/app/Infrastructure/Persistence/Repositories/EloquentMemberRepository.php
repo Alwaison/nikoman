@@ -50,7 +50,10 @@ final class EloquentMemberRepository implements MemberRepositoryInterface
     /** @return PaginatedResult<Member> */
     public function paginate(int $page, int $perPage): PaginatedResult
     {
-        $paginator = MemberModel::orderBy('created_at')->paginate($perPage, ['*'], 'page', $page);
+        $paginator = MemberModel::query()
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->paginate($perPage, ['*'], 'page', $page);
 
         $items = array_map(
             fn (MemberModel $model): Member => new Member(
