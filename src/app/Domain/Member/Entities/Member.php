@@ -40,4 +40,15 @@ final class Member
     {
         return $this->updatedAt;
     }
+
+    public function update(string $name, string $email, DateTimeImmutable $updatedAt): self
+    {
+        return new self(
+            id: $this->id,
+            name: $name,
+            email: $email,
+            createdAt: $this->createdAt,
+            updatedAt: $updatedAt,
+        );
+    }
 }

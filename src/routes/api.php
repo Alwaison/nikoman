@@ -11,4 +11,5 @@ Route::prefix('v1')->group(function (): void {
 
     Route::post('/members', [MemberController::class, 'store'])->name('members.store');
     Route::get('/members/{memberId}', [MemberController::class, 'show'])->name('members.show');
+    Route::put('/members/{memberId}', [MemberController::class, 'update'])->name('members.update');
 });
