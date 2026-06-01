@@ -647,10 +647,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          description: Set by the server on creation. Cannot be supplied by the client.
         updated_at:
           type: string
           format: date-time
           readOnly: true
+          description: Set by the server on every write. Cannot be supplied by the client.
 
     TeamCollection:
       type: object
@@ -698,10 +700,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          description: Set by the server on creation. Cannot be supplied by the client.
         updated_at:
           type: string
           format: date-time
           readOnly: true
+          description: Set by the server on every write. Cannot be supplied by the client.
 
     MemberCollection:
       type: object
@@ -748,14 +752,20 @@ components:
         team_id:
           type: string
           format: uuid
+          readOnly: true
+          description: Set on creation. Cannot be changed.
         member_id:
           type: string
           format: uuid
+          readOnly: true
+          description: Set on creation. Cannot be changed.
         mood:
           $ref: '#/components/schemas/Mood'
         date:
           type: string
           format: date
+          readOnly: true
+          description: Set on creation. Cannot be changed.
           example: '2024-01-15'
         note:
           type: ['string', 'null']
@@ -764,10 +774,12 @@ components:
           type: string
           format: date-time
           readOnly: true
+          description: Set by the server on creation. Cannot be supplied by the client.
         updated_at:
           type: string
           format: date-time
           readOnly: true
+          description: Set by the server on every write. Cannot be supplied by the client.
 
     MoodEntryCollection:
       type: object
