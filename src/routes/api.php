@@ -12,4 +12,5 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/members', [MemberController::class, 'store'])->name('members.store');
     Route::get('/members/{memberId}', [MemberController::class, 'show'])->whereUuid('memberId')->name('members.show');
     Route::put('/members/{memberId}', [MemberController::class, 'update'])->whereUuid('memberId')->name('members.update');
+    Route::delete('/members/{memberId}', [MemberController::class, 'destroy'])->whereUuid('memberId')->name('members.destroy');
 });

@@ -40,4 +40,9 @@ final class EloquentMemberRepository implements MemberRepositoryInterface
             updatedAt: new DateTimeImmutable($model->updated_at->toDateTimeString()),
         );
     }
+
+    public function delete(string $id): void
+    {
+        MemberModel::destroy($id);
+    }
 }
