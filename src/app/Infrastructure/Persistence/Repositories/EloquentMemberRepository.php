@@ -6,6 +6,7 @@ namespace App\Infrastructure\Persistence\Repositories;
 
 use App\Domain\Member\Entities\Member;
 use App\Domain\Member\Repositories\MemberRepositoryInterface;
+use App\Domain\Shared\ValueObjects\PaginatedResult;
 use App\Infrastructure\Persistence\Models\MemberModel;
 use DateTimeImmutable;
 
@@ -13,7 +14,7 @@ final class EloquentMemberRepository implements MemberRepositoryInterface
 {
     public function save(Member $member): void
     {
-        MemberModel::updateOrCreate(
+        MemberModel::query()->updateOrCreate(
             ['id' => $member->id()],
             [
                 'name' => $member->name(),
@@ -26,7 +27,7 @@ final class EloquentMemberRepository implements MemberRepositoryInterface
 
     public function findById(string $id): ?Member
     {
-        $model = MemberModel::find($id);
+        $model = MemberModel::query()->find($id);
 
         if ($model === null) {
             return null;
@@ -43,6 +44,40 @@ final class EloquentMemberRepository implements MemberRepositoryInterface
 
     public function delete(string $id): void
     {
-        MemberModel::destroy($id);
+        MemberModel::query()->whereKey($id)->delete();
+    }
+
+    /** @return PaginatedResult<Member> */
+    public function paginate(int $page, int $perPage, ?string $name = null): PaginatedResult
+    {
+        $query = MemberModel::query();
+
+        if ($name !== null) {
+            $query->where('name', 'ilike', '%'.addcslashes($name, '%_\\').'%');
+        }
+
+        $paginator = $query
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->paginate($perPage, ['*'], 'page', $page);
+
+        $items = array_map(
+            fn (MemberModel $model): Member => new Member(
+                id: $model->id,
+                name: $model->name,
+                email: $model->email,
+                createdAt: new DateTimeImmutable($model->created_at->toDateTimeString()),
+                updatedAt: new DateTimeImmutable($model->updated_at->toDateTimeString()),
+            ),
+            $paginator->items(),
+        );
+
+        return new PaginatedResult(
+            items: $items,
+            total: $paginator->total(),
+            perPage: $paginator->perPage(),
+            currentPage: $paginator->currentPage(),
+            lastPage: $paginator->lastPage(),
+        );
     }
 }
