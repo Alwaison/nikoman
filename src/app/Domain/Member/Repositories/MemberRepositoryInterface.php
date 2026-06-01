@@ -16,5 +16,5 @@ interface MemberRepositoryInterface
     public function delete(string $id): void;
 
     /** @return PaginatedResult<Member> */
-    public function paginate(int $page, int $perPage): PaginatedResult;
+    public function paginate(int $page, int $perPage, ?string $name = null): PaginatedResult;
 }

@@ -48,9 +48,15 @@ final class EloquentMemberRepository implements MemberRepositoryInterface
     }
 
     /** @return PaginatedResult<Member> */
-    public function paginate(int $page, int $perPage): PaginatedResult
+    public function paginate(int $page, int $perPage, ?string $name = null): PaginatedResult
     {
-        $paginator = MemberModel::query()
+        $query = MemberModel::query();
+
+        if ($name !== null) {
+            $query->where('name', 'ilike', '%'.addcslashes($name, '%_\\').'%');
+        }
+
+        $paginator = $query
             ->orderBy('created_at')
             ->orderBy('id')
             ->paginate($perPage, ['*'], 'page', $page);

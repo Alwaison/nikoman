@@ -260,6 +260,12 @@ paths:
       operationId: members.index
       summary: List members
       parameters:
+        - name: name
+          in: query
+          description: Filter members by name (case-insensitive partial match)
+          schema:
+            type: string
+            maxLength: 255
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PerPage'
       responses:

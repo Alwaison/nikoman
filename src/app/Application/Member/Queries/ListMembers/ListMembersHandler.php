@@ -17,6 +17,6 @@ final class ListMembersHandler
     /** @return PaginatedResult<Member> */
     public function handle(ListMembersQuery $query): PaginatedResult
     {
-        return $this->repository->paginate($query->page, $query->perPage);
+        return $this->repository->paginate($query->page, $query->perPage, $query->name);
     }
 }

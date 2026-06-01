@@ -174,4 +174,96 @@ final class IndexMemberTest extends TestCase
 
         $this->assertCount(4, array_unique($allIds), 'No rows should be skipped or duplicated across pages.');
     }
+
+    // ── Name filter ───────────────────────────────────────────────────────────
+
+    public function test_filters_members_by_exact_name(): void
+    {
+        $this->postJson('/api/v1/members', ['name' => 'Alice Smith', 'email' => 'alice@example.com']);
+        $this->postJson('/api/v1/members', ['name' => 'Bob Jones', 'email' => 'bob@example.com']);
+
+        $response = $this->getJson('/api/v1/members?name=Alice+Smith')->assertStatus(200);
+
+        $this->assertCount(1, $response->json('data'));
+        $this->assertSame('Alice Smith', $response->json('data.0.name'));
+    }
+
+    public function test_filters_members_by_partial_name(): void
+    {
+        $this->postJson('/api/v1/members', ['name' => 'Alice Smith', 'email' => 'alice@example.com']);
+        $this->postJson('/api/v1/members', ['name' => 'Alice Johnson', 'email' => 'alicejohnson@example.com']);
+        $this->postJson('/api/v1/members', ['name' => 'Bob Jones', 'email' => 'bob@example.com']);
+
+        $response = $this->getJson('/api/v1/members?name=Alice')->assertStatus(200);
+
+        $this->assertCount(2, $response->json('data'));
+        $this->assertSame(2, $response->json('meta.total'));
+    }
+
+    public function test_name_filter_is_case_insensitive(): void
+    {
+        $this->postJson('/api/v1/members', ['name' => 'Alice Smith', 'email' => 'alice@example.com']);
+        $this->postJson('/api/v1/members', ['name' => 'Bob Jones', 'email' => 'bob@example.com']);
+
+        $this->assertCount(1, $this->getJson('/api/v1/members?name=alice')->json('data'));
+        $this->assertCount(1, $this->getJson('/api/v1/members?name=ALICE')->json('data'));
+        $this->assertCount(1, $this->getJson('/api/v1/members?name=AlIcE')->json('data'));
+    }
+
+    public function test_name_filter_returns_empty_when_no_match(): void
+    {
+        $this->postJson('/api/v1/members', ['name' => 'Alice Smith', 'email' => 'alice@example.com']);
+
+        $response = $this->getJson('/api/v1/members?name=nobody')->assertStatus(200);
+
+        $this->assertSame([], $response->json('data'));
+        $this->assertSame(0, $response->json('meta.total'));
+    }
+
+    public function test_name_filter_matches_substring_in_middle_of_name(): void
+    {
+        $this->postJson('/api/v1/members', ['name' => 'Alice Smith', 'email' => 'alice@example.com']);
+        $this->postJson('/api/v1/members', ['name' => 'Bob Jones', 'email' => 'bob@example.com']);
+
+        $response = $this->getJson('/api/v1/members?name=Smith')->assertStatus(200);
+
+        $this->assertCount(1, $response->json('data'));
+        $this->assertSame('Alice Smith', $response->json('data.0.name'));
+    }
+
+    public function test_name_filter_meta_total_reflects_filtered_count(): void
+    {
+        for ($i = 1; $i <= 5; $i++) {
+            $this->postJson('/api/v1/members', ['name' => "Alice {$i}", 'email' => "alice{$i}@example.com"]);
+        }
+        $this->postJson('/api/v1/members', ['name' => 'Bob Jones', 'email' => 'bob@example.com']);
+
+        $response = $this->getJson('/api/v1/members?name=Alice')->assertStatus(200);
+
+        $this->assertSame(5, $response->json('meta.total'));
+        $this->assertSame(1, $response->json('meta.last_page'));
+    }
+
+    public function test_name_filter_combined_with_pagination(): void
+    {
+        for ($i = 1; $i <= 5; $i++) {
+            $this->postJson('/api/v1/members', ['name' => "Alice {$i}", 'email' => "alice{$i}@example.com"]);
+        }
+        $this->postJson('/api/v1/members', ['name' => 'Bob Jones', 'email' => 'bob@example.com']);
+
+        $page1 = $this->getJson('/api/v1/members?name=Alice&per_page=3&page=1')->assertStatus(200);
+        $page2 = $this->getJson('/api/v1/members?name=Alice&per_page=3&page=2')->assertStatus(200);
+
+        $this->assertCount(3, $page1->json('data'));
+        $this->assertCount(2, $page2->json('data'));
+        $this->assertSame(5, $page1->json('meta.total'));
+        $this->assertSame(2, $page1->json('meta.last_page'));
+    }
+
+    public function test_returns_422_when_name_filter_exceeds_255_characters(): void
+    {
+        $this->getJson('/api/v1/members?name='.str_repeat('a', 256))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['name']);
+    }
 }

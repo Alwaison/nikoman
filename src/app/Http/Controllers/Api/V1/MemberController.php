@@ -39,6 +39,7 @@ final class MemberController extends Controller
             new ListMembersQuery(
                 page: $request->integer('page', 1),
                 perPage: $request->integer('per_page', 15),
+                name: $request->string('name')->toString() ?: null,
             )
         );
 
