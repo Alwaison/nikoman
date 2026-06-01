@@ -87,20 +87,21 @@ final class MemberTest extends TestCase
         $this->assertSame('jane@example.com', $original->email());
     }
 
-    public function test_updated_at_can_differ_from_created_at(): void
+    public function test_updated_at_is_greater_than_created_at_after_update(): void
     {
         $createdAt = new DateTimeImmutable('2024-01-01 00:00:00');
-        $updatedAt = new DateTimeImmutable('2024-06-01 12:00:00');
+        $laterUpdatedAt = new DateTimeImmutable('2024-06-01 12:00:00');
 
-        $member = new Member(
+        $original = new Member(
             id: '550e8400-e29b-41d4-a716-446655440001',
             name: 'Jane Doe',
             email: 'jane@example.com',
             createdAt: $createdAt,
-            updatedAt: $updatedAt,
+            updatedAt: $createdAt,
         );
 
-        $this->assertNotSame($member->createdAt(), $member->updatedAt());
-        $this->assertLessThan($member->updatedAt(), $member->createdAt());
+        $updated = $original->update('Jane Updated', 'jane.updated@example.com', $laterUpdatedAt);
+
+        $this->assertLessThan($updated->updatedAt(), $updated->createdAt());
     }
 }
