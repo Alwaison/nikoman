@@ -20,7 +20,14 @@ final class MemberModel extends Model
 
     public $incrementing = false;
 
+    public $timestamps = false;
+
     protected $keyType = 'string';
 
-    protected $fillable = ['id', 'name', 'email'];
+    protected $fillable = ['id', 'name', 'email', 'created_at', 'updated_at'];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
 }

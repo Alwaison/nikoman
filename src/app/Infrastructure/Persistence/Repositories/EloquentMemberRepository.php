@@ -18,6 +18,8 @@ final class EloquentMemberRepository implements MemberRepositoryInterface
             [
                 'name' => $member->name(),
                 'email' => $member->email(),
+                'created_at' => $member->createdAt()->format('Y-m-d H:i:s'),
+                'updated_at' => $member->updatedAt()->format('Y-m-d H:i:s'),
             ],
         );
     }
