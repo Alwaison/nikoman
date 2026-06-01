@@ -6,6 +6,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Application\Member\Commands\CreateMember\CreateMemberCommand;
 use App\Application\Member\Commands\CreateMember\CreateMemberHandler;
+use App\Application\Member\Commands\DeleteMember\DeleteMemberCommand;
+use App\Application\Member\Commands\DeleteMember\DeleteMemberHandler;
 use App\Application\Member\Commands\UpdateMember\UpdateMemberCommand;
 use App\Application\Member\Commands\UpdateMember\UpdateMemberHandler;
 use App\Application\Member\Queries\GetMember\GetMemberHandler;
@@ -15,6 +17,7 @@ use App\Http\Requests\Api\V1\StoreMemberRequest;
 use App\Http\Requests\Api\V1\UpdateMemberRequest;
 use App\Http\Resources\Api\V1\MemberResource;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
 
 final class MemberController extends Controller
 {
@@ -22,6 +25,7 @@ final class MemberController extends Controller
         private readonly CreateMemberHandler $createMemberHandler,
         private readonly GetMemberHandler $getMemberHandler,
         private readonly UpdateMemberHandler $updateMemberHandler,
+        private readonly DeleteMemberHandler $deleteMemberHandler,
     ) {}
 
     public function store(StoreMemberRequest $request): JsonResponse
@@ -56,5 +60,12 @@ final class MemberController extends Controller
         $member = $this->updateMemberHandler->handle($command);
 
         return (new MemberResource($member))->response();
+    }
+
+    public function destroy(string $memberId): Response
+    {
+        $this->deleteMemberHandler->handle(new DeleteMemberCommand($memberId));
+
+        return response()->noContent();
     }
 }

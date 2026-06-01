@@ -11,4 +11,6 @@ interface MemberRepositoryInterface
     public function save(Member $member): void;
 
     public function findById(string $id): ?Member;
+
+    public function delete(string $id): void;
 }
