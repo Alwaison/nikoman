@@ -7,7 +7,7 @@ namespace App\Application\Member\Commands\UpdateMember;
 use App\Domain\Member\Entities\Member;
 use App\Domain\Member\Exceptions\MemberNotFoundException;
 use App\Domain\Member\Repositories\MemberRepositoryInterface;
-use DateTimeImmutable;
+use Carbon\CarbonImmutable;
 
 final class UpdateMemberHandler
 {
@@ -23,7 +23,7 @@ final class UpdateMemberHandler
         $updated = $member->update(
             name: $command->name,
             email: $command->email,
-            updatedAt: new DateTimeImmutable,
+            updatedAt: CarbonImmutable::now(),
         );
 
         $this->repository->save($updated);

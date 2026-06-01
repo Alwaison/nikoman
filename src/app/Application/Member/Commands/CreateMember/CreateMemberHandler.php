@@ -6,7 +6,7 @@ namespace App\Application\Member\Commands\CreateMember;
 
 use App\Domain\Member\Entities\Member;
 use App\Domain\Member\Repositories\MemberRepositoryInterface;
-use DateTimeImmutable;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 
 final class CreateMemberHandler
@@ -17,7 +17,7 @@ final class CreateMemberHandler
 
     public function handle(CreateMemberCommand $command): Member
     {
-        $now = new DateTimeImmutable;
+        $now = CarbonImmutable::now();
 
         $member = new Member(
             id: (string) Str::uuid(),

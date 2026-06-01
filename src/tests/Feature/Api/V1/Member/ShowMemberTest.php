@@ -31,11 +31,29 @@ final class ShowMemberTest extends TestCase
             ]);
     }
 
+    public function test_response_timestamps_match_creation_data(): void
+    {
+        $created = $this->postJson('/api/v1/members', [
+            'name' => 'Jane Doe',
+            'email' => 'jane@example.com',
+        ]);
+
+        $fetched = $this->getJson("/api/v1/members/{$created->json('id')}");
+
+        $this->assertSame($created->json('created_at'), $fetched->json('created_at'));
+        $this->assertSame($created->json('updated_at'), $fetched->json('updated_at'));
+    }
+
     public function test_returns_404_when_member_does_not_exist(): void
     {
-        $response = $this->getJson('/api/v1/members/00000000-0000-0000-0000-000000000000');
-
-        $response->assertStatus(404)
+        $this->getJson('/api/v1/members/00000000-0000-0000-0000-000000000000')
+            ->assertStatus(404)
             ->assertJsonStructure(['message']);
+    }
+
+    public function test_returns_404_for_unknown_id(): void
+    {
+        $this->getJson('/api/v1/members/non-existent-id')
+            ->assertStatus(404);
     }
 }
