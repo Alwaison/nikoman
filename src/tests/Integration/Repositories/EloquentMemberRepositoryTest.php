@@ -8,6 +8,7 @@ use App\Domain\Member\Entities\Member;
 use App\Domain\Member\Exceptions\DuplicateEmailException;
 use App\Infrastructure\Persistence\Repositories\EloquentMemberRepository;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -49,7 +50,7 @@ final class EloquentMemberRepositoryTest extends TestCase
         ));
     }
 
-    public function test_duplicate_email_exception_carries_the_conflicting_email(): void
+    public function test_duplicate_email_exception_chains_original_db_exception(): void
     {
         $now = CarbonImmutable::now();
         $email = 'conflict@example.com';
@@ -72,7 +73,11 @@ final class EloquentMemberRepositoryTest extends TestCase
             ));
             $this->fail('DuplicateEmailException was not thrown.');
         } catch (DuplicateEmailException $e) {
-            $this->assertStringContainsString($email, $e->getMessage());
+            $this->assertInstanceOf(
+                UniqueConstraintViolationException::class,
+                $e->getPrevious(),
+                'Original DB exception must be chained for debugging.'
+            );
         }
     }
 }

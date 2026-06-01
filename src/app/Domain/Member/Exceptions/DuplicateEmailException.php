@@ -8,8 +8,8 @@ use RuntimeException;
 
 final class DuplicateEmailException extends RuntimeException
 {
-    public static function forEmail(string $email): self
+    public static function create(?\Throwable $previous = null): self
     {
-        return new self("The email {$email} is already taken.");
+        return new self('The email has already been taken.', 0, $previous);
     }
 }

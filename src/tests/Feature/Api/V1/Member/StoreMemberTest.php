@@ -129,26 +129,32 @@ final class StoreMemberTest extends TestCase
 
     public function test_race_condition_returns_422_not_500(): void
     {
-        // Both requests see no existing member during validation.
-        // The second save() hits the DB unique constraint — must return 422.
-        $this->postJson('/api/v1/members', ['name' => 'Alice', 'email' => 'race@example.com'])
-            ->assertStatus(201);
-
-        // Simulate the race: bypass FormRequest validation by calling the
-        // endpoint after manually deleting the validation guard (we insert
-        // a duplicate directly at the DB level to trigger the constraint).
+        // Insert the "winning" request's member directly in the DB, simulating
+        // a committed transaction that happened after the "losing" request
+        // already passed the unique:email validation check.
         DB::table('members')->insert([
             'id' => (string) Str::uuid(),
-            'name' => 'Race clone',
-            'email' => 'race2@example.com',
+            'name' => 'Race winner',
+            'email' => 'race@example.com',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
 
-        // Now try to insert the same email through the API — the DB constraint
-        // fires even though validation would pass in a race (both checked before insert).
-        // We verify the application returns 422, not 500.
-        $this->postJson('/api/v1/members', ['name' => 'Racer', 'email' => 'race2@example.com'])
+        // Bind a StoreMemberRequest subclass with no validation rules so the
+        // request reaches EloquentMemberRepository::save() despite the duplicate
+        // email already present in the DB — exactly what happens in the race.
+        $this->app->bind(
+            StoreMemberRequest::class,
+            fn () => new class extends StoreMemberRequest
+            {
+                public function rules(): array
+                {
+                    return [];
+                }
+            }
+        );
+
+        $this->postJson('/api/v1/members', ['name' => 'Race loser', 'email' => 'race@example.com'])
             ->assertStatus(422)
             ->assertJsonStructure(['message', 'errors' => ['email']]);
     }

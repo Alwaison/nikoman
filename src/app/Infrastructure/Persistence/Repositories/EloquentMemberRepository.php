@@ -26,8 +26,8 @@ final class EloquentMemberRepository implements MemberRepositoryInterface
                     'updated_at' => $member->updatedAt()->format('Y-m-d H:i:s'),
                 ],
             );
-        } catch (UniqueConstraintViolationException) {
-            throw DuplicateEmailException::forEmail($member->email());
+        } catch (UniqueConstraintViolationException $e) {
+            throw DuplicateEmailException::create($e);
         }
     }
 
