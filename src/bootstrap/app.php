@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Domain\Member\Exceptions\DuplicateEmailException;
 use App\Domain\Member\Exceptions\MemberNotFoundException;
+use App\Http\Middleware\ForceJsonResponse;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,7 +19,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->api(prepend: [
+            ForceJsonResponse::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (MemberNotFoundException $e, Request $request): JsonResponse {

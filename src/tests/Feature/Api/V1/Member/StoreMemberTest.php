@@ -158,4 +158,14 @@ final class StoreMemberTest extends TestCase
             ->assertStatus(422)
             ->assertJsonStructure(['message', 'errors' => ['email']]);
     }
+
+    public function test_returns_json_422_without_accept_header(): void
+    {
+        $response = $this->post('/api/v1/members', ['name' => 'Jane Doe'], [
+            'Content-Type' => 'application/json',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['email']);
+    }
 }

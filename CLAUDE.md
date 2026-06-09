@@ -146,6 +146,12 @@ Red → Green → Refactor → Mutate:
 **Feature tests** (`tests/Feature/`) extend `Tests\TestCase` and use `RefreshDatabase` — DB required.  
 **Integration tests** (`tests/Integration/`) test repository implementations directly against the real PostgreSQL DB; extend `Tests\TestCase` and use `RefreshDatabase`. Use them to verify DB-level constraints (e.g. unique violations) that cannot be triggered through the HTTP layer.
 
+**Every endpoint must have comprehensive test coverage across all layers.** For each new endpoint create:
+- Unit test for the domain entity (`tests/Unit/Domain/`)
+- Unit test for the application handler with mocked repository (`tests/Unit/Application/`)
+- Feature test for the HTTP contract (`tests/Feature/Api/V1/`)
+- Integration test for the repository implementation (`tests/Integration/Repositories/`) — covers persistence, upsert, nullable fields, and any DB-level constraints
+
 For time-dependent tests use `$this->travel(N)->second()` — never `sleep()`.  
 To simulate race conditions, insert rows directly with `DB::table()->insert()` to bypass FormRequest validation and exercise the repository's DB-constraint path.
 
