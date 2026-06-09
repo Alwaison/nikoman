@@ -27,7 +27,6 @@ install: ## Bootstrap the project (run once after cloning)
 	cp docker/config/pint.json src/pint.json
 	cp docker/config/phpstan.neon src/phpstan.neon
 	cp docker/config/phpunit.xml src/phpunit.xml
-	cp docker/config/infection.json5 src/infection.json5
 	@echo "→ Installing quality tools..."
 	docker run --rm \
 		-v $(PWD)/src:/app \
