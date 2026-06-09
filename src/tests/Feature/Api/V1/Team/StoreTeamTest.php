@@ -105,4 +105,14 @@ final class StoreTeamTest extends TestCase
             ->assertStatus(201)
             ->assertJson(['description' => null]);
     }
+
+    public function test_returns_json_422_without_accept_header(): void
+    {
+        $response = $this->post('/api/v1/teams', ['description' => 'No name'], [
+            'Content-Type' => 'application/json',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['name']);
+    }
 }
