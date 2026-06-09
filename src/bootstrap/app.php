@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domain\Member\Exceptions\DuplicateEmailException;
 use App\Domain\Member\Exceptions\MemberNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -22,5 +23,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (MemberNotFoundException $e, Request $request): JsonResponse {
             return response()->json(['message' => $e->getMessage()], 404);
+        });
+
+        $exceptions->render(function (DuplicateEmailException $e, Request $request): JsonResponse {
+            return response()->json([
+                'message' => 'The email has already been taken.',
+                'errors' => ['email' => ['The email has already been taken.']],
+            ], 422);
         });
     })->create();

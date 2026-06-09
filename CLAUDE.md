@@ -66,18 +66,26 @@ The project follows clean architecture with strict layer separation:
 ```
 src/app/
 ├── Domain/              # Pure PHP — no framework dependencies
+│   ├── Shared/
+│   │   └── ValueObjects/    # e.g. PaginatedResult<T>
 │   ├── Calendar/
 │   │   ├── Entities/
 │   │   ├── Repositories/    # interfaces only
 │   │   └── ValueObjects/    # e.g. Mood enum
 │   ├── Team/
 │   └── Member/
+│       ├── Entities/
+│       ├── Exceptions/      # pure PHP RuntimeExceptions
+│       ├── Repositories/    # interfaces only
+│       └── ValueObjects/
 ├── Application/         # Use cases — orchestrates domain objects
 │   ├── Calendar/
 │   │   ├── Commands/    # writes (CreateMoodEntry, etc.)
 │   │   └── Queries/     # reads (GetTeamCalendar, etc.)
 │   ├── Team/
 │   └── Member/
+│       ├── Commands/    # writes (CreateMember, UpdateMember, DeleteMember)
+│       └── Queries/     # reads (GetMember, ListMembers)
 ├── Infrastructure/      # Framework-dependent adapters
 │   └── Persistence/
 │       ├── Models/          # Eloquent models (infra detail)
@@ -110,7 +118,12 @@ Lint rules that apply:
 
 - **Domain** classes must not import anything from `Illuminate\` or `App\Infrastructure\`.
 - **Application** services receive domain objects via constructor injection; never touch Eloquent directly.
+- **Application handlers** use `CarbonImmutable::now()` instead of `new DateTimeImmutable()` so Laravel's `$this->travel()` helper can control time in tests.
 - **Controllers** are thin: parse request → call one Application service → return one Resource.
+- **Eloquent models** set `public $timestamps = false` and declare explicit datetime `$casts`; the domain layer controls timestamps, Eloquent never overwrites them. All columns including `created_at`/`updated_at` must be in `$fillable`.
+- **Repository methods** must start queries with `Model::query()` rather than calling static methods directly (`Model::find()`, `Model::orderBy()`, …) so PHPStan can resolve the Builder return type without relying on Larastan's mixin coverage.
+- **Domain exceptions** extend `\RuntimeException` (no Illuminate imports) and are registered in `bootstrap/app.php` via `$exceptions->render()`. `UniqueConstraintViolationException` from the DB layer must be caught in the repository's `save()` and rethrown as a domain exception — never let it bubble as a 500.
+- **Single resources** (`JsonResource`) set `public static $wrap = null`. **Collection resources** return `{ data: [...], meta: { pagination } }` via a dedicated `*CollectionResource` class.
 - All new files must have `declare(strict_types=1)` (enforced by Pint).
 
 ## TDD workflow
@@ -125,7 +138,10 @@ Red → Green → Refactor:
 
 **Unit tests** (`tests/Unit/`) extend `PHPUnit\Framework\TestCase` directly — no Laravel bootstrap, no DB.  
 **Feature tests** (`tests/Feature/`) extend `Tests\TestCase` and use `RefreshDatabase` — DB required.  
-**Integration tests** (`tests/Integration/`) test repository implementations against the real PostgreSQL DB.
+**Integration tests** (`tests/Integration/`) test repository implementations directly against the real PostgreSQL DB; extend `Tests\TestCase` and use `RefreshDatabase`. Use them to verify DB-level constraints (e.g. unique violations) that cannot be triggered through the HTTP layer.
+
+For time-dependent tests use `$this->travel(N)->second()` — never `sleep()`.  
+To simulate race conditions, insert rows directly with `DB::table()->insert()` to bypass FormRequest validation and exercise the repository's DB-constraint path.
 
 ## Domain model
 
@@ -139,9 +155,19 @@ Red → Green → Refactor:
 ## API conventions
 
 - All routes prefixed `/api/v1/`.
-- Responses follow JSON:API-inspired structure: `{ data, meta, errors }`.
+- **Single-entity** responses are unwrapped (no `data` key). **Collection** responses use `{ data: [...], meta: { total, per_page, current_page, last_page } }`.
 - HTTP status codes: 200 OK, 201 Created, 204 No Content, 422 Unprocessable Entity, 404 Not Found.
-- Validation errors return 422 with an `errors` key listing field-level messages.
+- Validation errors return 422 with `{ message, errors: { field: [messages] } }`. Domain exceptions that represent constraint violations (e.g. duplicate email) must render with the same shape so clients handle them identically.
+- **Emails** are always normalized to lowercase before validation and storage. Use `prepareForValidation()` in FormRequests — not in handlers or controllers.
+- **Route parameters** that accept UUIDs must use `->whereUuid('param')` so non-UUID values return 404 without reaching the handler or the database.
+
+## Database conventions
+
+- **Timestamps** are stored as `timestamp(0)` (second precision). Always add a secondary `orderBy('id')` tiebreaker when ordering by `created_at` to guarantee stable pagination when rows share the same second.
+- **Pagination** defaults: `page=1`, `per_page=15`, max `per_page=100`. Use `PaginatedResult<T>` from `Domain/Shared/ValueObjects/` as the return type for paginated repository methods.
+- **Concurrent indexes** — migrations that create or drop indexes must use `CONCURRENTLY` and set `public $withinTransaction = false` (untyped, to match the untyped parent property) to avoid blocking writes during deployment.
+- **ILIKE searches** — escape user input with `addcslashes($value, '%_\\')` before interpolating into a LIKE/ILIKE pattern. Use a GIN trigram index (`gin_trgm_ops`, requires `pg_trgm` extension) for full partial-match performance on large tables.
+- **Index documentation** — state what query each index covers in the migration commit message.
 
 ## Docker networking
 

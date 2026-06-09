@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Api\V1\Member;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 final class StoreMemberTest extends TestCase
@@ -102,5 +104,58 @@ final class StoreMemberTest extends TestCase
         $this->postJson('/api/v1/members', ['name' => 'John Doe', 'email' => 'jane@example.com'])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['email']);
+    }
+
+    public function test_email_is_normalized_to_lowercase(): void
+    {
+        $response = $this->postJson('/api/v1/members', [
+            'name' => 'Jane Doe',
+            'email' => 'JANE@EXAMPLE.COM',
+        ]);
+
+        $response->assertStatus(201);
+        $this->assertSame('jane@example.com', $response->json('email'));
+        $this->assertDatabaseHas('members', ['email' => 'jane@example.com']);
+    }
+
+    public function test_duplicate_email_detected_case_insensitively(): void
+    {
+        $this->postJson('/api/v1/members', ['name' => 'Jane Doe', 'email' => 'jane@example.com']);
+
+        $this->postJson('/api/v1/members', ['name' => 'John Doe', 'email' => 'JANE@EXAMPLE.COM'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['email']);
+    }
+
+    public function test_race_condition_returns_422_not_500(): void
+    {
+        // Insert the "winning" request's member directly in the DB, simulating
+        // a committed transaction that happened after the "losing" request
+        // already passed the unique:email validation check.
+        DB::table('members')->insert([
+            'id' => (string) Str::uuid(),
+            'name' => 'Race winner',
+            'email' => 'race@example.com',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Bind a StoreMemberRequest subclass with no validation rules so the
+        // request reaches EloquentMemberRepository::save() despite the duplicate
+        // email already present in the DB — exactly what happens in the race.
+        $this->app->bind(
+            StoreMemberRequest::class,
+            fn () => new class extends StoreMemberRequest
+            {
+                public function rules(): array
+                {
+                    return [];
+                }
+            }
+        );
+
+        $this->postJson('/api/v1/members', ['name' => 'Race loser', 'email' => 'race@example.com'])
+            ->assertStatus(422)
+            ->assertJsonStructure(['message', 'errors' => ['email']]);
     }
 }
