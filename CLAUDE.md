@@ -57,6 +57,11 @@ make quality                      # lint + static analysis
 make lint                         # Pint check (dry run)
 make lint-fix                     # Pint auto-fix
 make analyse                      # Larastan PHPStan level 8
+
+# Mutation testing (run after every new feature or fix)
+make mutate                       # full mutation run (Domain + Application)
+make mutate-diff                  # mutate only files changed vs main (fastest during development)
+make mutate-filter f=Member       # mutate only files matching "Member"
 ```
 
 ## Architecture
@@ -128,13 +133,14 @@ Lint rules that apply:
 
 ## TDD workflow
 
-Red → Green → Refactor:
+Red → Green → Refactor → Mutate:
 
 1. Write a failing test in `tests/Unit/Domain/` or `tests/Feature/Api/V1/`.
 2. Run `make test-unit` (or `make test-filter f=YourTest`) — confirm red.
 3. Write the minimum code to pass.
 4. Run `make quality` to pass lint + static analysis.
 5. Refactor if needed, keeping tests green.
+6. Run `make mutate-diff` — mutates only the files changed on this branch vs `main`, so it's fast. Kill escaping mutants by sharpening assertions. After the feature or fix is merged, run `make mutate` to verify the full suite.
 
 **Unit tests** (`tests/Unit/`) extend `PHPUnit\Framework\TestCase` directly — no Laravel bootstrap, no DB.  
 **Feature tests** (`tests/Feature/`) extend `Tests\TestCase` and use `RefreshDatabase` — DB required.  

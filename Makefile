@@ -2,6 +2,7 @@
 .PHONY: help install up down restart bash artisan composer \
         test test-unit test-feature test-filter \
         lint lint-fix analyse quality \
+        mutate mutate-diff mutate-filter \
         migrate fresh logs ps spec-lint
 
 help: ## Show available commands
@@ -26,6 +27,7 @@ install: ## Bootstrap the project (run once after cloning)
 	cp docker/config/pint.json src/pint.json
 	cp docker/config/phpstan.neon src/phpstan.neon
 	cp docker/config/phpunit.xml src/phpunit.xml
+	cp docker/config/infection.json5 src/infection.json5
 	@echo "→ Installing quality tools..."
 	docker run --rm \
 		-v $(PWD)/src:/app \
@@ -34,7 +36,7 @@ install: ## Bootstrap the project (run once after cloning)
 	docker run --rm \
 		-v $(PWD)/src:/app \
 		-w /app \
-		composer:2 require --dev "phpunit/phpunit:^11" "larastan/larastan" --no-interaction
+		composer:2 require --dev "phpunit/phpunit:^11" "larastan/larastan" "infection/infection:^0.33" --no-interaction
 	@echo "→ Scaffolding clean architecture..."
 	bash docker/scripts/scaffold.sh src
 	@echo "→ Starting environment..."
@@ -115,6 +117,17 @@ analyse: ## Static analysis (Larastan level 8)
 	docker compose exec app ./vendor/bin/phpstan analyse --memory-limit=512M
 
 quality: lint analyse ## Run all quality checks (lint + static analysis)
+
+# ─── Mutation testing ─────────────────────────────────────────────────────────
+
+mutate: ## Run mutation tests (Domain + Application layers, covered code only)
+	docker compose exec app ./vendor/bin/infection --threads=4
+
+mutate-diff: ## Mutation tests only on files changed vs main (fastest during development)
+	docker compose exec app ./vendor/bin/infection --threads=4 --git-diff-filter=AM --git-diff-base=main
+
+mutate-filter: ## Mutation tests on a specific path: make mutate-filter f=Member
+	docker compose exec app ./vendor/bin/infection --threads=4 --filter=$(f)
 
 # ─── Specification ────────────────────────────────────────────────────────────
 
