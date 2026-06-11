@@ -12,3 +12,6 @@ src/storage/framework/sessions/
 src/storage/framework/testing/
 src/storage/framework/views/
 src/bootstrap/cache/*.php
+
+# claude
+.claude/settings.local.json
